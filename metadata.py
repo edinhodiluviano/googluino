@@ -8,6 +8,7 @@ Created on Sat Oct  6 19:26:19 2018
 
 
 SITES = {
+#%%
     'newport':{
         'domain':'newportcom.com.br',
         'url':'http://newportcom.com.br/catalogsearch/result/index/?limit=12&q=<query>',
@@ -32,6 +33,7 @@ SITES = {
             },
         },
     },
+#%%
     'mscnbrasil':{
         'domain':'mscnbrasil.com.br',
         'url':'http://www.mscnbrasil.com.br/buscas.php?search_query=<query>',
@@ -54,6 +56,7 @@ SITES = {
             },
         },
     },
+#%%
     'hperobotica':{
         'domain':'hperobotica.com.br',
         'url':'http://www.hperobotica.com.br/search.html',
@@ -76,6 +79,7 @@ SITES = {
             },
         },
     },
+#%%
     'multcomercial':{
         'domain':'multcomercial.com.br',
         'url':'https://loja.multcomercial.com.br/catalogsearch/result/?q=<query>',
@@ -87,6 +91,7 @@ SITES = {
                 "tag.name":'li',
                 "tag.has_attr('class')":True,
                 "tag['class']":['item','last'],
+                "tag.find('span',{'class':'price'}) is not None":True,
             },
             'details':{
                 'name':"item['soup'].find('h2',{'class':'product-name'}).find('a').text",
@@ -96,6 +101,7 @@ SITES = {
             },
         },
     },
+#%%
     'filipeflop':{
         'domain':'filipeflop.com',
         'url':'https://www.filipeflop.com/?s=<query>&post_type=product',
@@ -118,6 +124,7 @@ SITES = {
             },
         },
     },
+#%%
     'baudaeletronica':{
         'domain':'baudaeletronica.com.br',
         'url':'https://www.baudaeletronica.com.br/catalogsearch/result/?q=<query>',
@@ -138,6 +145,7 @@ SITES = {
             },
         },
     },
+#%%
 }
 
 

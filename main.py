@@ -8,14 +8,17 @@ Created on Wed Oct  3 22:59:57 2018
 
 #%%
 
-del metadata
-
 import re
+import sys
 import json
 import urllib
+import datetime
+
 import requests
-import metadata
+import pandas as pd
 from bs4 import BeautifulSoup
+
+import metadata
 
 #%%
 
@@ -101,7 +104,7 @@ class BaseExtractor(object):
             raise requests.ConnectionError(f"Site {self.name}; expected status code 200, but got {self.http_response.status_code}")
     
     def extract_items(self):
-        self.soup = BeautifulSoup(self.http_response.text)
+        self.soup = BeautifulSoup(self.http_response.text, 'lxml')
         self.items = self.soup.find_all(self.is_item)
         self.items = [self.item_details(item) for item in self.items]
     
@@ -118,7 +121,12 @@ class BaseExtractor(object):
         item = {}
         item['soup'] = item_soup
         for detail in self.data['item']['details']:
-            item[detail] = eval(self.data['item']['details'][detail])
+            try:
+                item[detail] = eval(self.data['item']['details'][detail])
+            except:
+                print(f'\nvars:', 'site:"{self.name}"', 'detail:"{detail}"',
+                       'url:{self.http_response.url}\n', sep='\n\t')
+                raise
         if 'price' in item:
             self.convert_price_to_float(item)
         if 'name' in item:
@@ -139,35 +147,24 @@ class BaseExtractor(object):
 
 #%%
 
-for n, (site_name, site_data) in enumerate(metadata.SITES.items()):
-    if n>=5 :
-        extractor = BaseExtractor(site_name, site_data)
-        items = extractor.query('sensor de fumaca')
-        print(f'n: {n}', f'site: {site_name}', f'items: {len(items)}', sep='\t')
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        query_string = ' '.join(sys.argv[1:])
+        items = []
+        print()
+        for n, (site_name, site_data) in enumerate(metadata.SITES.items()):
+            extractor = BaseExtractor(site_name, site_data)
+            temp_items = extractor.query(query_string)
+            items = items + temp_items
+            print(f'n: {n}', f'query: "{query_string}"', f'site: {site_name}', f'items: {len(temp_items)}', sep='\t')
+        df = pd.DataFrame(items)
+        df.drop(['soup'], axis=1, inplace=True)
+        filename = f"results"
+        filename += f"_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}"
+        filename += f"_{query_string.replace(' ','_')}"
+        filename += ".csv"
+        df.to_csv(filename, index_label='n')
+        print(f'Searched {n} sites. Found {len(items)} results. Results saved to {filename}\n')
 
 #%%
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
