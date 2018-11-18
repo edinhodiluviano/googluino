@@ -8,10 +8,13 @@ Created on Wed Oct  3 22:59:57 2018
 
 #%%
 
+import time
+
 import re
 import sys
-import json
 import urllib
+import asyncio
+import logging
 import datetime
 
 import requests
@@ -22,57 +25,11 @@ import metadata
 
 #%%
 
-class Lojas(object):
-    
-    def __init__(self, url='https://garoa.net.br/wiki/Lojas', filename='lojas.json'):
-        self.filename = filename
-        self.url = url
-        self.load()
-        return
-    
-    def load(self):
-        try:
-            with open(self.filename, 'r') as f:
-                self.list = json.load(f)   
-        except FileNotFoundError:
-            self.list = []
-        return 
-    
-    def save(self):
-        with open(self.filename, 'w+') as f:
-            return json.dump(self.list, f)
-        
-    def update(self, save=True):        
-        #get garoa site
-        resp = requests.get(self.url)
-        if resp.status_code != 200:
-            raise requests.ConnectionError(f'Expected status code 200, but got {resp.status_code}')
-            return
-        #parse it
-        soup = BeautifulSoup(resp.text)
-        start_tag = soup.find("span", id="Componentes_para_Arduino").parent
-        end_tag = start_tag.find_next('h2')
-        self.list = []
-        while start_tag.next_sibling != end_tag:
-            if start_tag.next_sibling != '\n':
-                item = {}
-                if start_tag.next_sibling.find('dt').find('a'):
-                    item['name'] = start_tag.next_sibling.find('dt').find('a').text
-                    item['url'] = start_tag.next_sibling.find('dt').find('a')['href']
-                else:
-                    item['name'] = start_tag.next_sibling.find('dt').text
-                    item['url'] = None
-                item['desc'] = start_tag.next_sibling.find_all('dd')[-1].text
-                self.list.append(item)
-            start_tag = start_tag.next_sibling        
-        #persist the results (or not)
-        if save == True:
-            self.save()        
-        return
-    
-    
-    
-    
+logging.basicConfig(
+    format='[%(asctime)s] [%(levelname)s]: %(message)s', 
+    level=logging.INFO
+)
+
 #%%
 
 class BaseExtractor(object):
@@ -147,16 +104,54 @@ class BaseExtractor(object):
 
 #%%
 
+async def extract_site(site_name, site_data, query_string):
+    """
+    A coroutine to extract data from a site
+    """
+    logging.info(f'Extracting site {site_name}')
+    extractor = BaseExtractor(site_name, site_data)
+    items = extractor.query(query_string)
+    
+    return items
+
+#%%
+
+async def main(query_string):
+#	"""
+#	Creates a group of coroutines and waits for them to finish
+#	"""
+    
+    coroutines = []
+    for n, (site_name, site_data) in enumerate(metadata.SITES.items()):
+        coroutines.append(extract_site(site_name, site_data, query_string))
+    
+    completed, pending = await asyncio.wait(coroutines)
+    
+    items = []
+    for partial_items in completed:
+        items = items + partial_items.result()
+        
+    return items
+        
+ 
+#%%
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         query_string = ' '.join(sys.argv[1:])
-        items = []
-        print()
-        for n, (site_name, site_data) in enumerate(metadata.SITES.items()):
-            extractor = BaseExtractor(site_name, site_data)
-            temp_items = extractor.query(query_string)
-            items = items + temp_items
-            print(f'n: {n}', f'query: "{query_string}"', f'site: {site_name}', f'items: {len(temp_items)}', sep='\t')
+        
+        now = datetime.datetime.now()
+        
+        event_loop = asyncio.get_event_loop()
+        try:
+            items = event_loop.run_until_complete(main(query_string))
+        finally:
+            event_loop.close()
+        
+        now2 = datetime.datetime.now()
+        logging.info(f'total time: {now2-now}')
+        
+        n = len(metadata.SITES.items())
         df = pd.DataFrame(items)
         df.drop(['soup'], axis=1, inplace=True)
         filename = f"results"
@@ -164,7 +159,6 @@ if __name__ == '__main__':
         filename += f"_{query_string.replace(' ','_')}"
         filename += ".csv"
         df.to_csv(filename, index_label='n')
-        print(f'Searched {n} sites. Found {len(items)} results. Results saved to {filename}\n')
+        logging.info(f'Searched {n} sites. Found {len(items)} results. Results saved to {filename}\n')
 
 #%%
-
